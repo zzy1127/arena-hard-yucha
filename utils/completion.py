@@ -116,6 +116,48 @@ def make_config(config_file: str) -> dict:
 
     return config_kwargs
 
+def send_request(messages, base_url=None, api_key=None, model=None, retries=30):
+    import requests, time
+    endpoint = "/chat/completions"
+    API_URL = base_url + endpoint
+    API_KEY = api_key
+    TIMEOUT = 60
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.0
+    }
+    for _ in range(retries):
+        try:
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=TIMEOUT)
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"].strip()
+            print("OK!")
+            return content
+        except Exception as e:
+            print("Error:", e)
+            time.sleep(2)
+    
+    return None
+
+@register_api("request")
+def chat_completion_request(model, messages, temperature, max_tokens, api_dict=None, **kwargs):
+    base_url=api_dict["api_base"]
+    api_key=api_dict["api_key"]
+    try:
+        response_text = send_request(messages, base_url=base_url, api_key=api_key, model=model)
+        if response_text is None:
+            return None
+        return {"answer": str(response_text)}
+    except Exception as e:
+        print("Request failed:", e)
+        return None
+
 
 @register_api("openai")
 def chat_completion_openai(model, messages, temperature, max_tokens, api_dict=None, **kwargs):
